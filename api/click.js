@@ -1,10 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
-import { nanoid } from 'nanoid';
 
 const supa = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
 export default async function handler(req, res){
   if(req.method!=='POST') return res.status(405).end();
+  const { nanoid } = await import('nanoid');
   const ip = (req.headers['x-forwarded-for']||req.socket.remoteAddress).split(',')[0];
   const { payload } = req.body || {};
   const token = nanoid(10);
