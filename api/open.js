@@ -10,7 +10,6 @@ const allowedOrigins = [
   'http://localhost:4200',
 ];
 
-// Helper CORS
 function setupCors(req, res) {
   const origin = req.headers.origin;
 
@@ -45,18 +44,45 @@ export default async function handler(req, res) {
   const ip = String(rawIp).split(',')[0].trim() || null;
   const userAgentHeader = req.headers['user-agent'] || null;
 
-  // Payload desde el frontend (fingerprint-based)
-  const {
-    fpId,                // 👈 fingerprintjs visitorId (OBLIGATORIO para atribución)
-    language,
-    timezone,
-    userAgent,           // opcional, si lo mandas desde el front
-    screen,              // opcional: { innerW, innerH, screenW, screenH, dpr }
-    deviceId,            // opcional
-    token,               // opcional: por si quieres arrastrar el token de la landing
-  } = req.body || {};
+  const body = req.body || {};
 
+  // 👇 AQUÍ nos volvemos tolerantes con la forma del body
+  const fpId =
+    body.fpId ||
+    body.fp_id ||
+    body?.payload?.fpId ||
+    body?.payload?.fp_id ||
+    null;
+
+  const language =
+    body.language ||
+    body?.payload?.language ||
+    null;
+
+  const timezone =
+    body.timezone ||
+    body?.payload?.timezone ||
+    null;
+
+  const userAgent =
+    body.userAgent ||
+    body?.payload?.userAgent ||
+    body?.payload?.ua_js ||
+    userAgentHeader;
+
+  const deviceId =
+    body.deviceId ||
+    body?.payload?.deviceId ||
+    null;
+
+  const token =
+    body.token ||
+    body?.payload?.token ||
+    null;
+
+  // 👈 Este es el único campo realmente obligatorio para la atribución
   if (!fpId) {
+    console.error('[api/open] missing_fingerprint. Body recibido:', JSON.stringify(body));
     return res.status(400).json({ error: 'missing_fingerprint' });
   }
 
@@ -75,22 +101,26 @@ export default async function handler(req, res) {
 
   const click = clickEvents?.[0] || null;
 
-  // 2) Lógica de match: mismo fingerprint + < 5 minutos
+  // 2) Lógica de match: SOLO por fingerprint + tiempo (puedes relajarla si quieres)
   let matched = false;
+  let deltaSeconds = null;
 
   if (click && click.ts) {
-    const deltaSeconds = (Date.now() - new Date(click.ts).getTime()) / 1000;
+    deltaSeconds = (Date.now() - new Date(click.ts).getTime()) / 1000;
+    // Mientras debugueas, si quieres puedes comentar esta línea y matchear siempre que exista click
     if (deltaSeconds < 300) {
       matched = true;
     }
   }
 
-  // 3) Insert en app_opens (solo columnas que existen en tu tabla)
+  console.log('[api/open] fpId:', fpId, 'click_found:', !!click, 'deltaSeconds:', deltaSeconds, 'matched:', matched);
+
+  // 3) Insert en app_opens
   const { error: insertError } = await supa.from('app_opens').insert({
-    event_token: click?.event_token || token || null,                 // arrastras el token si existe
-    device_id: deviceId || null,
+    event_token: click?.event_token || token || null,
+    device_id: deviceId,
     ip,
-    user_agent: userAgent || userAgentHeader,
+    user_agent: userAgent,
     language: language || click?.language || null,
     timezone: timezone || click?.timezone || null,
     fp_id: fpId,
@@ -99,10 +129,14 @@ export default async function handler(req, res) {
 
   if (insertError) {
     console.error('[api/open] Error inserting app_open', insertError);
-    return res.status(500).json({
-      error: 'insert_failed',
-    });
+    return res.status(500).json({ error: 'insert_failed' });
   }
 
-  return res.status(200).json({ match: matched });
+  return res.status(200).json({
+    match: matched,
+    debug: {
+      clickFound: !!click,
+      deltaSeconds,
+    },
+  });
 }
