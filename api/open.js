@@ -64,8 +64,7 @@ export default async function handler(req, res) {
     screen_h: screenH,
     dpr,
     ts_open: new Date().toISOString(),
-    matched_click_id: matched ? click.id : null,
-    match_score: matched ? 100 : 0,
+   // matched_click_id: matched ? click.id : null,
   });
 
   if (insertError) {
