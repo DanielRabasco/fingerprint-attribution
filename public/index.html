@@ -9,6 +9,7 @@
 <body>
 <script>
 (async function() {
+  console.log('[landing] script start');
   const ts_click = Date.now();
   const payload = {
     ua_js: navigator.userAgent,
@@ -22,26 +23,54 @@
     ts_click
   };
 
+  console.log('[landing] base payload:', payload);
+
+  // Fingerprint
   try {
     const fp = await FingerprintJS.load();
     const result = await fp.get();
     payload.fp_id = result.visitorId;
-  } catch(e){}
+    console.log('[landing] fingerprint OK:', payload.fp_id);
+  } catch(e){
+    console.error('[landing] fingerprint ERROR', e);
+  }
 
   try {
+    console.log('[landing] calling /api/click...');
     const res = await fetch('/api/click', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({campaign:'android', payload})
+      body: JSON.stringify({ campaign: 'android', payload })
     });
-    const { token } = await res.json();
+
+    console.log('[landing] /api/click status:', res.status, res.statusText);
+
+    if (!res.ok) {
+      // si tu API devuelve 4xx/5xx, lo vemos claro
+      const text = await res.text();
+      console.error('[landing] API not OK. Body:', text);
+      throw new Error('API response not ok');
+    }
+
+    const data = await res.json();
+    console.log('[landing] response JSON:', data);
+    const { token } = data;
+
+    if (!token) {
+      console.error('[landing] token missing in response');
+      throw new Error('Missing token');
+    }
 
     // Direct app open via intent (Android)
-    const intentUrl = `intent://open?ctx=${token}#Intent;scheme=myapp;package=com.tuapp;end`;
+    const intentUrl =
+      `intent://open?ctx=${encodeURIComponent(token)}#Intent;scheme=myapp;package=com.tuapp;end`;
+    console.log('[landing] redirecting to intent URL');
     window.location.replace(intentUrl);
+
   } catch(e){
-    console.error(e);
+    console.error('[landing] ERROR in fetch or redirect block:', e);
     // fallback Play Store
+    console.log('[landing] redirecting to Play Store fallback');
     window.location.replace('https://play.google.com/store/apps/details?id=com.cognifit.app&hl=en');
   }
 })();
