@@ -36,6 +36,7 @@ module.exports = async (req, res) => {
       null;
 
     // Extraemos del payload lo que nos interesa
+    const fp_id = payload?.fp_id || null;
     const userAgent = payload?.ua_js || null;
     const language = payload?.language || null;
     const timezone = payload?.timezone || null;
@@ -68,7 +69,8 @@ module.exports = async (req, res) => {
         language,
         timezone,
         screen,
-        ts         // si es null, Postgres meterá el default now()
+        ts,
+        fp_id
       })
       .select('*');
 

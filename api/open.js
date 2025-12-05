@@ -1,26 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 const supa = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
-// Dominios permitidos para llamar a esta API
-const allowedOrigins = [
-  'https://fingerprint-project-theta.vercel.app',
-  'http://localhost:3000',
-  'http://localhost:4200',
-  'http://localhost'
-];
-
 export default async function handler(req, res) {
-  const origin = req.headers.origin;
-
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-  // Responder al preflight
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
+  if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).end();
 
   const rawIp =
@@ -30,31 +16,46 @@ export default async function handler(req, res) {
     '';
   const ip = String(rawIp).split(',')[0].trim();
 
-  const { token, model, os, language, timezone, screenW, screenH, dpr } = req.body;
+  // 👇 Recibimos EXACTAMENTE el mismo payload que en el click
+  const { payload, model, os, screenW, screenH, dpr } = req.body || {};
+  const fp_id = payload?.fp_id || null;
+  const language = payload?.language || null;
+  const timezone = payload?.timezone || null;
 
-  // get click by token
+  if (!fp_id) {
+    console.log('[api/open] NO FP_ID → no match');
+    return res.json({ match: false });
+  }
+
+  // Buscar el click más reciente de ese fingerprint
   const { data: clicks, error: clicksError } = await supa
     .from('click_events')
     .select('*')
-    .eq('event_token', token)
+    .eq('fp_id', fp_id)
+    .order('ts', { ascending: false })
     .limit(1);
 
   if (clicksError) {
-    console.error('Error fetching clicks', clicksError);
+    console.error('Error fetching click by fp_id', clicksError);
     return res.status(500).json({ error: 'click_lookup_failed' });
   }
 
   const click = clicks?.[0];
 
-  // match logic simple: IP + token + time < 5min
   let matched = false;
+
   if (click) {
-    const delta = (Date.now() - new Date(click.ts_click).getTime()) / 1000;
-    if (delta < 300 && click.ip === ip) matched = true;
+    const clickTs = click.ts ? new Date(click.ts).getTime() : 0;
+    const deltaSeconds = (Date.now() - clickTs) / 1000;
+
+    if (deltaSeconds < 300) {
+      matched = true;
+    }
   }
 
+  // Inserta el open
   const { error: insertError } = await supa.from('app_opens').insert({
-    token,
+    fp_id,
     ip,
     model,
     os,
@@ -63,8 +64,9 @@ export default async function handler(req, res) {
     screen_w: screenW,
     screen_h: screenH,
     dpr,
-    ts_open: new Date().toISOString(),
-   // matched_click_id: matched ? click.id : null,
+    ts: new Date().toISOString(),
+    matched_click_id: matched && click ? click.id : null,
+    match_score: matched ? 100 : 0,
   });
 
   if (insertError) {
