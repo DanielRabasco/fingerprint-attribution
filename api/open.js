@@ -36,7 +36,7 @@ export default async function handler(req, res) {
   const { data: clicks, error: clicksError } = await supa
     .from('click_events')
     .select('*')
-    .eq('token', token)
+    .eq('event_token', token)
     .limit(1);
 
   if (clicksError) {
