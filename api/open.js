@@ -17,7 +17,7 @@ export default async function handler(req,res){
     if(delta<300 && click.ip===ip) matched=true;
   }
 
-  await supa.from('opens').insert({
+  await supa.from('app_opens').insert({
     token, ip, model, os, locale: language, timezone, screen_w: screenW,
     screen_h: screenH, dpr, ts_open: new Date().toISOString(),
     matched_click_id: matched?click.id:null, match_score: matched?100:0

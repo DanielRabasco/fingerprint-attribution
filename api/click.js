@@ -9,7 +9,7 @@ export default async function handler(req, res){
   const { payload } = req.body || {};
   const token = nanoid(10);
 
-  await supa.from('clicks').insert({
+  await supa.from('click_events').insert({
     token, campaign: 'android', ip,
     ua_http: req.headers['user-agent'],
     ua_js: payload?.ua_js,

@@ -9,7 +9,35 @@
 <body>
 <script>
 (async function() {
-  console.log('[landing] script start');
+  const PLAY_URL = 'https://play.google.com/store/apps/details?id=com.cognifit.app&hl=en';
+
+  function redirectToAppOrStore(token) {
+    const ua = navigator.userAgent || '';
+    const isAndroid = /Android/i.test(ua);
+    const isChrome = /Chrome/i.test(ua);
+    const intentUrl =
+      `intent://open?ctx=${encodeURIComponent(token)}#Intent;scheme=myapp;package=com.tuapp;end`;
+
+    // Solo intent en Chrome Android
+    if (isAndroid && isChrome) {
+      const start = Date.now();
+      // Intent: si la app está instalada, se abre y JS “muere” ahí
+      window.location.href = intentUrl;
+
+      // Fallback: si seguimos en la página 1.5–2s después, vamos a Play Store
+      setTimeout(() => {
+        const elapsed = Date.now() - start;
+        if (elapsed < 2000) {
+          // Probablemente no había handler / app instalada
+          window.location.href = PLAY_URL;
+        }
+      }, 1500);
+    } else {
+      // Escritorio, iOS, otros navegadores → directo a Play Store
+      window.location.href = PLAY_URL;
+    }
+  }
+
   const ts_click = Date.now();
   const payload = {
     ua_js: navigator.userAgent,
@@ -23,57 +51,34 @@
     ts_click
   };
 
-  console.log('[landing] base payload:', payload);
-
-  // Fingerprint
   try {
     const fp = await FingerprintJS.load();
     const result = await fp.get();
     payload.fp_id = result.visitorId;
-    console.log('[landing] fingerprint OK:', payload.fp_id);
-  } catch(e){
-    console.error('[landing] fingerprint ERROR', e);
-  }
+  } catch(e){}
 
   try {
-    console.log('[landing] calling /api/click...');
     const res = await fetch('/api/click', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ campaign: 'android', payload })
+      body: JSON.stringify({campaign:'android', payload})
     });
 
-    console.log('[landing] /api/click status:', res.status, res.statusText);
-
     if (!res.ok) {
-      // si tu API devuelve 4xx/5xx, lo vemos claro
-      const text = await res.text();
-      console.error('[landing] API not OK. Body:', text);
-      throw new Error('API response not ok');
+      console.error('API /click no OK', res.status, res.statusText);
+      redirectToAppOrStore(null); // aún así redirigimos
+      return;
     }
 
-    const data = await res.json();
-    console.log('[landing] response JSON:', data);
-    const { token } = data;
-
-    if (!token) {
-      console.error('[landing] token missing in response');
-      throw new Error('Missing token');
-    }
-
-    // Direct app open via intent (Android)
-    const intentUrl =
-      `intent://open?ctx=${encodeURIComponent(token)}#Intent;scheme=myapp;package=com.tuapp;end`;
-    console.log('[landing] redirecting to intent URL');
-    window.location.replace(intentUrl);
-
+    const { token } = await res.json();
+    redirectToAppOrStore(token);
   } catch(e){
-    console.error('[landing] ERROR in fetch or redirect block:', e);
-    // fallback Play Store
-    console.log('[landing] redirecting to Play Store fallback');
-    window.location.replace('https://play.google.com/store/apps/details?id=com.cognifit.app&hl=en');
+    console.error('Error en fetch /api/click:', e);
+    // Si falla la API, igualmente mandamos al Play Store / app
+    redirectToAppOrStore(null);
   }
 })();
 </script>
+
 </body>
 </html>
