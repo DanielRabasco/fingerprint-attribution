@@ -1,28 +1,51 @@
-import { createClient } from '@supabase/supabase-js';
+// api/click.js (CommonJS en Vercel)
+const { createClient } = require('@supabase/supabase-js');
+const { randomUUID } = require('crypto');
 
-const supa = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+module.exports = async (req, res) => {
+  console.log('[api/click] start');
 
-export default async function handler(req, res){
-  if(req.method!=='POST') return res.status(405).end();
-  const { nanoid } = await import('nanoid');
-  const ip = (req.headers['x-forwarded-for']||req.socket.remoteAddress).split(',')[0];
-  const { payload } = req.body || {};
-  const token = nanoid(10);
+  if (req.method !== 'POST') {
+    console.log('[api/click] method not allowed:', req.method);
+    return res.status(405).json({ error: 'method_not_allowed' });
+  }
 
-  await supa.from('click_events').insert({
-    token, campaign: 'android', ip,
-    ua_http: req.headers['user-agent'],
-    ua_js: payload?.ua_js,
-    language: payload?.language,
-    timezone: payload?.timezone,
-    inner_w: payload?.innerW,
-    inner_h: payload?.innerH,
-    screen_w: payload?.screenW,
-    screen_h: payload?.screenH,
-    dpr: payload?.dpr,
-    fp_id: payload?.fp_id,
-    ts_click: new Date(payload?.ts_click).toISOString()
-  });
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY; // 👉 service_role, NO anon
 
-  res.json({ token });
-}
+  if (!supabaseUrl || !serviceKey) {
+    console.error('[api/click] Missing env vars SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY');
+    return res.status(500).json({ error: 'missing_env' });
+  }
+
+  const supabase = createClient(supabaseUrl, serviceKey);
+
+  try {
+    const { campaign, payload } = req.body || {};
+    console.log('[api/click] body:', { campaign, payload_exists: !!payload });
+
+    const token = randomUUID();
+
+    const { data, error } = await supabase
+      .from('click_events')           // 👈 tu tabla
+      .insert({
+        campaign,
+        payload,
+        token,
+        created_at: new Date().toISOString()
+      })
+      .select('*');
+
+    if (error) {
+      console.error('[api/click] Supabase insert ERROR:', error);
+      return res.status(500).json({ error: 'supabase_insert_failed', details: error.message });
+    }
+
+    console.log('[api/click] Supabase insert OK. Row:', data && data[0]);
+
+    return res.status(200).json({ token });
+  } catch (e) {
+    console.error('[api/click] UNCAUGHT ERROR:', e);
+    return res.status(500).json({ error: 'server_error' });
+  }
+};
