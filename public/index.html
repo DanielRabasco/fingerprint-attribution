@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <title>Landing</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script src="https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@3/dist/fp.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@3.4.0/dist/fp.min.js"></script>
 </head>
 <body>
 <script>
@@ -29,12 +29,12 @@
         const elapsed = Date.now() - start;
         if (elapsed < 2000) {
           // Probablemente no había handler / app instalada
-          window.location.href = PLAY_URL;
+         // window.location.href = PLAY_URL;
         }
       }, 1500);
     } else {
       // Escritorio, iOS, otros navegadores → directo a Play Store
-      window.location.href = PLAY_URL;
+     // window.location.href = PLAY_URL;
     }
   }
 
@@ -54,6 +54,8 @@
   try {
     const fp = await FingerprintJS.load();
     const result = await fp.get();
+    console.log('[Landing] visitorId:', payload.fp_id);
+
     payload.fp_id = result.visitorId;
   } catch(e){}
 
