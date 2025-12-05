@@ -2,7 +2,12 @@ import { createClient } from '@supabase/supabase-js';
 const supa = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
 // Dominios permitidos para llamar a esta API
-const allowedOrigins = ['https://fingerprint-project-theta.vercel.app'];
+const allowedOrigins = [
+  'https://fingerprint-project-theta.vercel.app',
+  'http://localhost:3000',
+  'http://localhost:4200',
+  'http://localhost'
+];
 
 export default async function handler(req, res) {
   const origin = req.headers.origin;
