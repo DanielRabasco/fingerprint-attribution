@@ -27,7 +27,7 @@ module.exports = async (req, res) => {
     const token = randomUUID();
 
     const { data, error } = await supabase
-      .from('click_events')           // 👈 tu tabla
+      .from('clicks')           // 👈 tu tabla
       .insert({
         campaign,
         payload,
