@@ -54,12 +54,11 @@
   try {
     const fp = await FingerprintJS.load();
     const result = await fp.get();
-    console.log('[Landing] visitorId:', payload.fp_id);
-
     payload.fp_id = result.visitorId;
   } catch(e){}
 
   try {
+        console.log('[Landing] visitorId:', payload.fp_id);
     const res = await fetch('/api/click', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
