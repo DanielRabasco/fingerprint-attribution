@@ -1,4 +1,4 @@
-// api/click.js (CommonJS en Vercel)
+// api/click.js
 const { createClient } = require('@supabase/supabase-js');
 const { randomUUID } = require('crypto');
 
@@ -6,12 +6,11 @@ module.exports = async (req, res) => {
   console.log('[api/click] start');
 
   if (req.method !== 'POST') {
-    console.log('[api/click] method not allowed:', req.method);
     return res.status(405).json({ error: 'method_not_allowed' });
   }
 
   const supabaseUrl = process.env.SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY; // 👉 service_role, NO anon
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !serviceKey) {
     console.error('[api/click] Missing env vars SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY');
@@ -24,25 +23,65 @@ module.exports = async (req, res) => {
     const { campaign, payload } = req.body || {};
     console.log('[api/click] body:', { campaign, payload_exists: !!payload });
 
+    // token único que luego mandas como ctx en la intent URL
     const token = randomUUID();
 
+    // IP desde los headers de Vercel
+    const ip =
+      (req.headers['x-forwarded-for'] || '')
+        .toString()
+        .split(',')[0]
+        .trim() ||
+      req.socket?.remoteAddress ||
+      null;
+
+    // Extraemos del payload lo que nos interesa
+    const userAgent = payload?.ua_js || null;
+    const language = payload?.language || null;
+    const timezone = payload?.timezone || null;
+
+    // Montamos un resumen de pantalla en un string (la columna es text)
+    // Puedes cambiar el formato si quieres
+    let screen = null;
+    if (payload) {
+      const innerW = payload.innerW ?? null;
+      const innerH = payload.innerH ?? null;
+      const screenW = payload.screenW ?? null;
+      const screenH = payload.screenH ?? null;
+      const dpr = payload.dpr ?? null;
+      screen = JSON.stringify({ innerW, innerH, screenW, screenH, dpr });
+    }
+
+    // Timestamp del click si viene en el payload; si no, lo dejamos a null y usará el default now()
+    let ts = null;
+    if (payload?.ts_click) {
+      // ts_click viene en ms → lo convertimos a ISO
+      ts = new Date(payload.ts_click).toISOString();
+    }
+
     const { data, error } = await supabase
-      .from('click_events')           // 👈 tu tabla
+      .from('click_events')
       .insert({
-        campaign,
-        payload,
-        token,
-        created_at: new Date().toISOString()
+        event_token: token,
+        ip,
+        user_agent: userAgent,
+        language,
+        timezone,
+        screen,
+        ts         // si es null, Postgres meterá el default now()
       })
       .select('*');
 
     if (error) {
       console.error('[api/click] Supabase insert ERROR:', error);
-      return res.status(500).json({ error: 'supabase_insert_failed', details: error.message });
+      return res
+        .status(500)
+        .json({ error: 'supabase_insert_failed', details: error.message });
     }
 
     console.log('[api/click] Supabase insert OK. Row:', data && data[0]);
 
+    // devolvemos el token para usarlo en la intent URL
     return res.status(200).json({ token });
   } catch (e) {
     console.error('[api/click] UNCAUGHT ERROR:', e);
