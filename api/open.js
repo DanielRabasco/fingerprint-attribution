@@ -92,6 +92,8 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'missing_fingerprint' });
   }
 
+  console.log('[api/open] fpId recibido:', fpId);
+
   // 1) Buscar el último click_event con ese fingerprint
   const { data: clickEvents, error: clickError } = await supa
     .from('click_events')
@@ -99,6 +101,8 @@ export default async function handler(req, res) {
     .eq('fp_id', fpId)
     .order('ts', { ascending: false })
     .limit(1);
+
+  console.log('[api/open] clickEvents devueltos por Supabase:', clickEvents);
 
   if (clickError) {
     console.error('[api/open] Error fetching click_events', clickError);
