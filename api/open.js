@@ -4,22 +4,30 @@ import { createClient } from '@supabase/supabase-js';
 const supa = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
 const allowedOrigins = [
-  'https://fingerprint-project-theta.vercel.app',
-  'http://localhost',
-  'http://localhost:3000',
-  'http://localhost:4200',
+  'https://fingerprint-project-theta.vercel.app', // producción
 ];
 
 function setupCors(req, res) {
   const origin = req.headers.origin;
 
-  if (origin && (allowedOrigins.includes(origin) || origin.startsWith('http://localhost'))) {
+  const isLocalhost =
+    origin &&
+    /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+
+  const isAllowedExplicitly =
+    origin && allowedOrigins.includes(origin);
+
+  if (origin && (isLocalhost || isAllowedExplicitly)) {
+    // Refleja exactamente el origin permitido
     res.setHeader('Access-Control-Allow-Origin', origin);
   }
 
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'Content-Type, X-Requested-With, Accept'
+  );
   res.setHeader('Access-Control-Allow-Credentials', 'true');
 }
 
@@ -46,7 +54,6 @@ export default async function handler(req, res) {
 
   const body = req.body || {};
 
-  // 👇 AQUÍ nos volvemos tolerantes con la forma del body
   const fpId =
     body.fpId ||
     body.fp_id ||
@@ -80,7 +87,6 @@ export default async function handler(req, res) {
     body?.payload?.token ||
     null;
 
-  // 👈 Este es el único campo realmente obligatorio para la atribución
   if (!fpId) {
     console.error('[api/open] missing_fingerprint. Body recibido:', JSON.stringify(body));
     return res.status(400).json({ error: 'missing_fingerprint' });
@@ -101,13 +107,12 @@ export default async function handler(req, res) {
 
   const click = clickEvents?.[0] || null;
 
-  // 2) Lógica de match: SOLO por fingerprint + tiempo (puedes relajarla si quieres)
+  // 2) Match por fingerprint + tiempo
   let matched = false;
   let deltaSeconds = null;
 
   if (click && click.ts) {
     deltaSeconds = (Date.now() - new Date(click.ts).getTime()) / 1000;
-    // Mientras debugueas, si quieres puedes comentar esta línea y matchear siempre que exista click
     if (deltaSeconds < 300) {
       matched = true;
     }
@@ -124,7 +129,6 @@ export default async function handler(req, res) {
     language: language || click?.language || null,
     timezone: timezone || click?.timezone || null,
     fp_id: fpId,
-    // ts lo pone el DEFAULT now()
   });
 
   if (insertError) {
