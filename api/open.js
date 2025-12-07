@@ -1,7 +1,7 @@
 // /api/open.js
 import { createClient } from '@supabase/supabase-js';
 
-const supa = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const supa = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 const allowedOrigins = [
   'https://fingerprint-project-theta.vercel.app', // producción
