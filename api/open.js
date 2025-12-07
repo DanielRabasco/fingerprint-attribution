@@ -1,7 +1,10 @@
 // /api/open.js
 import { createClient } from '@supabase/supabase-js';
 
-const supa = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+const supa = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 const allowedOrigins = [
   'https://fingerprint-project-theta.vercel.app', // producción
@@ -92,13 +95,20 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'missing_fingerprint' });
   }
 
-  console.log('[api/open] fpId recibido:', fpId);
+  console.log('[api/open] fpId recibido:', fpId, 'ip recibida:', ip);
 
-  // 1) Buscar el último click_event con ese fingerprint
-  const { data: clickEvents, error: clickError } = await supa
+  // 1) Buscar el último click_event con ese fingerprint + IP
+  let clickQuery = supa
     .from('click_events')
     .select('*')
-    .eq('fp_id', fpId)
+    .eq('fp_id', fpId);
+
+  // Si tenemos IP, la usamos también para el match
+  if (ip) {
+    clickQuery = clickQuery.eq('ip', ip);
+  }
+
+  const { data: clickEvents, error: clickError } = await clickQuery
     .order('ts', { ascending: false })
     .limit(1);
 
@@ -111,7 +121,7 @@ export default async function handler(req, res) {
 
   const click = clickEvents?.[0] || null;
 
-  // 2) Match por fingerprint + tiempo
+  // 2) Match por fingerprint + IP + tiempo
   let matched = false;
   let deltaSeconds = null;
 
@@ -122,7 +132,14 @@ export default async function handler(req, res) {
     }
   }
 
-  console.log('[api/open] fpId:', fpId, 'click_found:', !!click, 'deltaSeconds:', deltaSeconds, 'matched:', matched);
+  console.log(
+    '[api/open]',
+    'fpId:', fpId,
+    'ip:', ip,
+    'click_found:', !!click,
+    'deltaSeconds:', deltaSeconds,
+    'matched:', matched
+  );
 
   // 3) Insert en app_opens
   const { error: insertError } = await supa.from('app_opens').insert({
@@ -145,6 +162,7 @@ export default async function handler(req, res) {
     debug: {
       clickFound: !!click,
       deltaSeconds,
+      usedIp: ip,
     },
   });
 }
