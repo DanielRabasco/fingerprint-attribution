@@ -127,7 +127,7 @@ export default async function handler(req, res) {
 
   if (click && click.ts) {
     deltaSeconds = (Date.now() - new Date(click.ts).getTime()) / 1000;
-    if (deltaSeconds < 300) {
+    if (deltaSeconds < 60) {
       matched = true;
     }
   }
