@@ -121,6 +121,7 @@ async function getDeviceFingerprint() {
   const encoder = new TextEncoder();
   const data = encoder.encode(canonical);
   const digest = await window.crypto.subtle.digest('SHA-256', data);
+  console.log('Canonical string for fingerprint:', digest);
   return bufferToHex(digest);
 }
 
@@ -128,6 +129,7 @@ async function getDeviceFingerprint() {
   const PLAY_URL = 'https://google.com';//https://play.google.com/store/apps/details?id=com.cognifit.app';
 
   function redirectToAppOrStore(token) {
+    return;
     const ua = navigator.userAgent || '';
     const isAndroid = /Android/i.test(ua);
     const isChrome = /Chrome/i.test(ua);
@@ -170,12 +172,12 @@ async function getDeviceFingerprint() {
   try {
     const result = await getDeviceFingerprint();
     console.log('[Landing] device fingerprint:', result);
-    payload.fp_id = result.visitorId;
+    payload.fp_id = result;
   } catch(e){}
 
   try {
-        console.log('[Landing] visitorId:', payload.fp_id);
-    const res = await fetch('/api/click', {
+      console.log('[Landing] visitorId:', payload.fp_id);
+      const res = await fetch('/api/click', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({campaign:'android', payload})
