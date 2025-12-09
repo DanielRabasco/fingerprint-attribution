@@ -8,6 +8,127 @@
 </head>
 <body>
 <script>
+
+  // fingerprint.js
+
+// Convierte ArrayBuffer (hash) a string hexadecimal
+function bufferToHex(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let hex = '';
+  for (let i = 0; i < bytes.length; i++) {
+    const current = bytes[i].toString(16).padStart(2, '0');
+    hex += current;
+  }
+  return hex;
+}
+
+// Comprueba si localStorage está disponible (sin romperse por restricciones)
+function hasLocalStorage() {
+  try {
+    const key = '__fp_test_ls__';
+    window.localStorage.setItem(key, '1');
+    window.localStorage.removeItem(key);
+    return 1;
+  } catch (e) {
+    return 0;
+  }
+}
+
+// Igual para sessionStorage
+function hasSessionStorage() {
+  try {
+    const key = '__fp_test_ss__';
+    window.sessionStorage.setItem(key, '1');
+    window.sessionStorage.removeItem(key);
+    return 1;
+  } catch (e) {
+    return 0;
+  }
+}
+
+// Recoge SOLO datos muy básicos, presentes siempre en móvil
+function getFingerprintComponents() {
+  const nav = (typeof navigator !== 'undefined') ? navigator : {};
+  const scr = (typeof screen !== 'undefined') ? screen : {};
+  const hasIntl = typeof Intl !== 'undefined' && typeof Intl.DateTimeFormat === 'function';
+
+  let timeZone = '';
+  try {
+    if (hasIntl) {
+      const opts = Intl.DateTimeFormat().resolvedOptions();
+      timeZone = opts.timeZone || '';
+    }
+  } catch (e) {
+    timeZone = '';
+  }
+
+  return {
+    // Navegador / SO
+    userAgent: nav.userAgent || '',
+    platform: nav.platform || '',
+    language: nav.language || '',
+    languages: Array.isArray(nav.languages) ? nav.languages.join(',') : '',
+    maxTouchPoints: nav.maxTouchPoints || 0,
+
+    // Pantalla
+    screenWidth: scr.width || 0,
+    screenHeight: scr.height || 0,
+    availWidth: scr.availWidth || 0,
+    availHeight: scr.availHeight || 0,
+    colorDepth: scr.colorDepth || 0,
+    pixelRatio: typeof window !== 'undefined' && window.devicePixelRatio ? window.devicePixelRatio : 1,
+
+    // Zona horaria / fecha
+    timezoneOffset: new Date().getTimezoneOffset(),
+    timeZone,
+
+    // Capacidades de navegador
+    cookieEnabled: nav.cookieEnabled ? 1 : 0,
+    doNotTrack: nav.doNotTrack || '',
+    localStorage: hasLocalStorage(),
+    sessionStorage: hasSessionStorage()
+  };
+}
+
+// Normaliza los datos y genera un string determinista
+function buildCanonicalString(components) {
+  const keys = Object.keys(components).sort(); // orden fijo
+  return keys
+    .map(k => `${k}:${String(components[k])}`)
+    .join('|');
+}
+
+// Fingerprint final: SHA-256 del string canónico (hex)
+async function getDeviceFingerprint() {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+    throw new Error('Fingerprint solo puede calcularse en el navegador.');
+  }
+
+  const components = getFingerprintComponents();
+  const canonical = buildCanonicalString(components);
+
+  if (!window.crypto || !window.crypto.subtle) {
+    // Fallback muy simple si no hay Web Crypto (raro en móviles modernos)
+    // Ojo: menos seguro / único, pero mantiene coherencia.
+    let hash = 0;
+    for (let i = 0; i < canonical.length; i++) {
+      hash = ((hash << 5) - hash) + canonical.charCodeAt(i);
+      hash |= 0;
+    }
+    return `fallback_${hash}`;
+  }
+
+  const encoder = new TextEncoder();
+  const data = encoder.encode(canonical);
+  const digest = await window.crypto.subtle.digest('SHA-256', data);
+  return bufferToHex(digest);
+}
+
+// Export para usar en módulos / Angular
+if (typeof module !== 'undefined') {
+  module.exports = { getDeviceFingerprint };
+}
+
 (async function() {
   const PLAY_URL = 'https://google.com';//https://play.google.com/store/apps/details?id=com.cognifit.app';
 
@@ -52,8 +173,8 @@
   };
 
   try {
-    const fp = await FingerprintJS.load();
-    const result = await fp.get();
+    const result = await getDeviceFingerprint();
+    console.log('[Landing] device fingerprint:', result);
     payload.fp_id = result.visitorId;
   } catch(e){}
 
