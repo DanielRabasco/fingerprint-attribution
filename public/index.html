@@ -9,7 +9,7 @@
 <body>
 <script>
 (async function() {
-  const PLAY_URL = 'https://play.google.com/store/apps/details?id=com.cognifit.app&hl=en';
+  const PLAY_URL = 'https://.google.com';//https://play.google.com/store/apps/details?id=com.cognifit.app';
 
   function redirectToAppOrStore(token) {
     const ua = navigator.userAgent || '';
@@ -19,7 +19,7 @@
       `intent://open?ctx=${encodeURIComponent(token)}#Intent;scheme=myapp;package=com.tuapp;end`;
 
     // Solo intent en Chrome Android
-    if (isAndroid && isChrome) {
+    if (false && isAndroid && isChrome) {
       const start = Date.now();
       // Intent: si la app está instalada, se abre y JS “muere” ahí
       window.location.href = intentUrl;
