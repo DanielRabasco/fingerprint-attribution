@@ -63,10 +63,6 @@ function hasSessionStorage() {
 
 
 
-// ----------------------------
-//  COMPONENTES DEL FINGERPRINT
-//  (solo parámetros muy estables)
-// ----------------------------
 function getFingerprintComponents() {
   const nav = navigator || {};
   const scr = screen || {};
@@ -78,26 +74,14 @@ function getFingerprintComponents() {
   } catch (e) { timeZone = ''; }
 
   return {
-    // SOLO la parte estable del UA (normalizado)
-    stableUserAgent: getStableUserAgent(),
-
-    // Plataforma / dispositivo
-    platform: nav.platform || '',
-
-    // Pantalla (dimensiones físicas)
-    screenWidth: scr.width || 0,
-    screenHeight: scr.height || 0,
     colorDepth: scr.colorDepth || 0,
-
-    // Escalado
+    maxTouchPoints: nav.maxTouchPoints || 0,
     pixelRatio: window.devicePixelRatio || 1,
-
-    // Zona horaria
-    timezoneOffset: new Date().getTimezoneOffset(),
+    screenHeight: scr.height || 0,
+    screenWidth: scr.width || 0,
+    stableUserAgent: getStableUserAgent(),
     timeZone,
-
-    // Opcional pero bastante estable
-    maxTouchPoints: nav.maxTouchPoints || 0
+    timezoneOffset: new Date().getTimezoneOffset(),
   };
 }
 
