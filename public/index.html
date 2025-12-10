@@ -4,101 +4,82 @@
   <meta charset="utf-8">
   <title>Landing</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script src="https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@3.4.0/dist/fp.min.js"></script>
 </head>
 <body>
 <script>
 
 // -----------------------------
-//  EXTRACCIÓN DEL UA ESTABLE
+// NORMALIZACIÓN DEL USER AGENT
+// (idéntica a Angular)
 // -----------------------------
-function getStableUserAgent() {
-  const ua = navigator.userAgent || "";
+function normalizeUserAgent(ua) {
+  if (!ua) return "";
 
-  const base = "Mozilla/5.0 (Linux; Android)";
-  const webkit = "AppleWebKit/537.36 (KHTML, like Gecko)";
-  const safari = "Mobile Safari/537.36";
+  // Extrae contenido entre paréntesis: "Linux; Android 12; ..." o "Linux; Android 10; K"
+  const platformMatch = ua.match(/\((.*?)\)/);
+  const platform = platformMatch ? platformMatch[1] : "";
 
-  return `${base} ${webkit} ${safari}`;
+  // Detecta major version de Chrome
+  const chromeMatch = ua.match(/Chrome\/(\d+)/);
+  const chromeVersion = chromeMatch ? `Chrome/${chromeMatch[1]}` : "";
+
+  return `${platform}|${chromeVersion}`;
 }
 
 
 
-// ------------------------------------------
-//  UTILIDADES ORIGINALES (hash, storage...)
-// ------------------------------------------
-
-function bufferToHex(buffer) {
-  const bytes = new Uint8Array(buffer);
-  let hex = '';
-  for (let i = 0; i < bytes.length; i++) {
-    const current = bytes[i].toString(16).padStart(2, '0');
-    hex += current;
-  }
-  return hex;
-}
-
+// -----------------------------
+// STORAGE CHECKS
+// -----------------------------
 function hasLocalStorage() {
   try {
-    const key = '__fp_test_ls__';
-    window.localStorage.setItem(key, '1');
-    window.localStorage.removeItem(key);
+    const key = "__fp_test_ls__";
+    localStorage.setItem(key, "1");
+    localStorage.removeItem(key);
     return 1;
-  } catch (e) {
-    return 0;
-  }
+  } catch { return 0; }
 }
 
 function hasSessionStorage() {
   try {
-    const key = '__fp_test_ss__';
-    window.sessionStorage.setItem(key, '1');
-    window.sessionStorage.removeItem(key);
+    const key = "__fp_test_ss__";
+    sessionStorage.setItem(key, "1");
+    sessionStorage.removeItem(key);
     return 1;
-  } catch (e) {
-    return 0;
-  }
+  } catch { return 0; }
 }
 
 
 
-// ----------------------------
-//  COMPONENTES DEL FINGERPRINT
-// ----------------------------
+// -----------------------------
+// COMPONENTES EXACTOS DEL FP
+// -----------------------------
 function getFingerprintComponents() {
-  const nav = navigator || {};
-  const scr = screen || {};
+  const nav = navigator;
+  const scr = screen;
 
-  let timeZone = '';
+  let tz = "";
   try {
-    const opts = Intl.DateTimeFormat().resolvedOptions();
-    timeZone = opts.timeZone || '';
-  } catch (e) { timeZone = ''; }
+    tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+  } catch {}
 
   return {
-    // SOLO la parte estable del UA
-    stableUserAgent: getStableUserAgent(),
+    // UA estable
+    userAgent: normalizeUserAgent(nav.userAgent || ""),
 
-    platform: nav.platform || '',
-    language: nav.language || '',
-    languages: Array.isArray(nav.languages) ? nav.languages.join(',') : '',
+    language: nav.language || "",
+    languages: Array.isArray(nav.languages) ? nav.languages.join(",") : "",
     maxTouchPoints: nav.maxTouchPoints || 0,
 
-    // Pantalla
+    // resolución física real (estable)
     screenWidth: scr.width || 0,
     screenHeight: scr.height || 0,
-    availWidth: scr.availWidth || 0,
-    availHeight: scr.availHeight || 0,
-    colorDepth: scr.colorDepth || 0,
     pixelRatio: window.devicePixelRatio || 1,
 
-    // Zona horaria
     timezoneOffset: new Date().getTimezoneOffset(),
-    timeZone,
+    timeZone: tz,
 
-    // Capacidades
     cookieEnabled: nav.cookieEnabled ? 1 : 0,
-    doNotTrack: nav.doNotTrack || '',
     localStorage: hasLocalStorage(),
     sessionStorage: hasSessionStorage()
   };
@@ -106,12 +87,14 @@ function getFingerprintComponents() {
 
 
 
-// ----------------------------
-//  CANONICAL STRING + HASH
-// ----------------------------
-function buildCanonicalString(components) {
-  const keys = Object.keys(components).sort();
-  return keys.map(k => `${k}:${String(components[k])}`).join('|');
+// -----------------------------
+// HASH
+// -----------------------------
+function buildCanonicalString(obj) {
+  return Object.keys(obj)
+    .sort()
+    .map(k => `${k}:${obj[k]}`)
+    .join("|");
 }
 
 async function getDeviceFingerprint() {
@@ -121,81 +104,53 @@ async function getDeviceFingerprint() {
   if (!crypto.subtle) {
     let hash = 0;
     for (let i = 0; i < canonical.length; i++) {
-      hash = ((hash << 5) - hash) + canonical.charCodeAt(i);
+      hash = (hash << 5) - hash + canonical.charCodeAt(i);
       hash |= 0;
     }
     return `fallback_${hash}`;
   }
 
-  const encoder = new TextEncoder();
-  const data = encoder.encode(canonical);
-  const digest = await crypto.subtle.digest('SHA-256', data);
-  return bufferToHex(digest);
+  const encoded = new TextEncoder().encode(canonical);
+  const digest = await crypto.subtle.digest("SHA-256", encoded);
+
+  const bytes = new Uint8Array(digest);
+  return [...bytes].map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
 
 
-// ----------------------------
-//  LANZADOR + REDIRECCIÓN
-// ----------------------------
-(async function() {
-  const PLAY_URL = 'https://google.com';
-
-  function redirectToAppOrStore(token) {
-    const ua = navigator.userAgent || '';
-    const isAndroid = /Android/i.test(ua);
-    const isChrome = /Chrome/i.test(ua);
-
-    const intentUrl =
-      `intent://open?ctx=${encodeURIComponent(token)}#Intent;scheme=myapp;package=com.tuapp;end`;
-
-    // Desactivado para pruebas
-    window.location.href = PLAY_URL;
-  }
-
-  const ts_click = Date.now();
+// -----------------------------
+// MAIN
+// -----------------------------
+(async function () {
+  const fp = await getDeviceFingerprint();
+  console.log("[Landing] FP:", fp);
 
   const payload = {
-    // AHORA usa el UA ESTABLE (normalizado)
-    ua_js: getStableUserAgent(),
-
-    language: navigator.language,
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-
-    innerW: window.innerWidth,
-    innerH: window.innerHeight,
+    fp_id: fp,
+    ua_js: normalizeUserAgent(navigator.userAgent || ""),
+    language: navigator.language || "",
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "",
     screenW: screen.width,
     screenH: screen.height,
-    dpr: window.devicePixelRatio,
-    ts_click
+    dpr: devicePixelRatio
   };
 
   try {
-    const fp = await getDeviceFingerprint();
-    console.log('[Landing] device fingerprint:', fp);
-    payload.fp_id = fp;
-  } catch (e) { }
-
-  try {
-    console.log('[Landing] visitorId:', payload.fp_id);
-
-    const res = await fetch('/api/click', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({campaign:'android', payload})
+    const res = await fetch("/api/click", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ campaign: "android", payload })
     });
 
-    if (!res.ok) {
-      redirectToAppOrStore(null);
-      return;
-    }
-
     const { token } = await res.json();
-    redirectToAppOrStore(token);
+
+    // redirección temporal
+    window.location.href = "https://google.com";
 
   } catch (e) {
-    console.error('Error en fetch /api/click:', e);
-    redirectToAppOrStore(null);
+    console.error("Error:", e);
+    window.location.href = "https://google.com";
   }
 })();
 
