@@ -9,9 +9,25 @@
 <body>
 <script>
 
-  // fingerprint.js
+// -----------------------------
+//  EXTRACCIÓN DEL UA ESTABLE
+// -----------------------------
+function getStableUserAgent() {
+  const ua = navigator.userAgent || "";
 
-// Convierte ArrayBuffer (hash) a string hexadecimal
+  const base = "Mozilla/5.0 (Linux; Android)";
+  const webkit = "AppleWebKit/537.36 (KHTML, like Gecko)";
+  const safari = "Mobile Safari/537.36";
+
+  return `${base} ${webkit} ${safari}`;
+}
+
+
+
+// ------------------------------------------
+//  UTILIDADES ORIGINALES (hash, storage...)
+// ------------------------------------------
+
 function bufferToHex(buffer) {
   const bytes = new Uint8Array(buffer);
   let hex = '';
@@ -22,7 +38,6 @@ function bufferToHex(buffer) {
   return hex;
 }
 
-// Comprueba si localStorage está disponible (sin romperse por restricciones)
 function hasLocalStorage() {
   try {
     const key = '__fp_test_ls__';
@@ -34,7 +49,6 @@ function hasLocalStorage() {
   }
 }
 
-// Igual para sessionStorage
 function hasSessionStorage() {
   try {
     const key = '__fp_test_ss__';
@@ -46,25 +60,25 @@ function hasSessionStorage() {
   }
 }
 
-// Recoge SOLO datos muy básicos, presentes siempre en móvil
+
+
+// ----------------------------
+//  COMPONENTES DEL FINGERPRINT
+// ----------------------------
 function getFingerprintComponents() {
-  const nav = (typeof navigator !== 'undefined') ? navigator : {};
-  const scr = (typeof screen !== 'undefined') ? screen : {};
-  const hasIntl = typeof Intl !== 'undefined' && typeof Intl.DateTimeFormat === 'function';
+  const nav = navigator || {};
+  const scr = screen || {};
 
   let timeZone = '';
   try {
-    if (hasIntl) {
-      const opts = Intl.DateTimeFormat().resolvedOptions();
-      timeZone = opts.timeZone || '';
-    }
-  } catch (e) {
-    timeZone = '';
-  }
+    const opts = Intl.DateTimeFormat().resolvedOptions();
+    timeZone = opts.timeZone || '';
+  } catch (e) { timeZone = ''; }
 
   return {
-    // Navegador / SO
-    userAgent: nav.userAgent || '',
+    // SOLO la parte estable del UA
+    stableUserAgent: getStableUserAgent(),
+
     platform: nav.platform || '',
     language: nav.language || '',
     languages: Array.isArray(nav.languages) ? nav.languages.join(',') : '',
@@ -76,13 +90,13 @@ function getFingerprintComponents() {
     availWidth: scr.availWidth || 0,
     availHeight: scr.availHeight || 0,
     colorDepth: scr.colorDepth || 0,
-    pixelRatio: typeof window !== 'undefined' && window.devicePixelRatio ? window.devicePixelRatio : 1,
+    pixelRatio: window.devicePixelRatio || 1,
 
-    // Zona horaria / fecha
+    // Zona horaria
     timezoneOffset: new Date().getTimezoneOffset(),
     timeZone,
 
-    // Capacidades de navegador
+    // Capacidades
     cookieEnabled: nav.cookieEnabled ? 1 : 0,
     doNotTrack: nav.doNotTrack || '',
     localStorage: hasLocalStorage(),
@@ -90,26 +104,21 @@ function getFingerprintComponents() {
   };
 }
 
-// Normaliza los datos y genera un string determinista
+
+
+// ----------------------------
+//  CANONICAL STRING + HASH
+// ----------------------------
 function buildCanonicalString(components) {
-  const keys = Object.keys(components).sort(); // orden fijo
-  return keys
-    .map(k => `${k}:${String(components[k])}`)
-    .join('|');
+  const keys = Object.keys(components).sort();
+  return keys.map(k => `${k}:${String(components[k])}`).join('|');
 }
 
-// Fingerprint final: SHA-256 del string canónico (hex)
 async function getDeviceFingerprint() {
-  if (typeof window === 'undefined' || typeof navigator === 'undefined') {
-    throw new Error('Fingerprint solo puede calcularse en el navegador.');
-  }
-
   const components = getFingerprintComponents();
   const canonical = buildCanonicalString(components);
 
-  if (!window.crypto || !window.crypto.subtle) {
-    // Fallback muy simple si no hay Web Crypto (raro en móviles modernos)
-    // Ojo: menos seguro / único, pero mantiene coherencia.
+  if (!crypto.subtle) {
     let hash = 0;
     for (let i = 0; i < canonical.length; i++) {
       hash = ((hash << 5) - hash) + canonical.charCodeAt(i);
@@ -120,46 +129,39 @@ async function getDeviceFingerprint() {
 
   const encoder = new TextEncoder();
   const data = encoder.encode(canonical);
-  const digest = await window.crypto.subtle.digest('SHA-256', data);
-  console.log('Canonical string for fingerprint:', digest);
+  const digest = await crypto.subtle.digest('SHA-256', data);
   return bufferToHex(digest);
 }
 
+
+
+// ----------------------------
+//  LANZADOR + REDIRECCIÓN
+// ----------------------------
 (async function() {
-  const PLAY_URL = 'https://google.com';//https://play.google.com/store/apps/details?id=com.cognifit.app';
+  const PLAY_URL = 'https://google.com';
 
   function redirectToAppOrStore(token) {
     const ua = navigator.userAgent || '';
     const isAndroid = /Android/i.test(ua);
     const isChrome = /Chrome/i.test(ua);
+
     const intentUrl =
       `intent://open?ctx=${encodeURIComponent(token)}#Intent;scheme=myapp;package=com.tuapp;end`;
 
-    // Solo intent en Chrome Android
-    if (false && isAndroid && isChrome) {
-      const start = Date.now();
-      // Intent: si la app está instalada, se abre y JS “muere” ahí
-      window.location.href = intentUrl;
-
-      // Fallback: si seguimos en la página 1.5–2s después, vamos a Play Store
-      setTimeout(() => {
-        const elapsed = Date.now() - start;
-        if (elapsed < 2000) {
-          // Probablemente no había handler / app instalada
-          window.location.href = PLAY_URL;
-        }
-      }, 1500);
-    } else {
-      // Escritorio, iOS, otros navegadores → directo a Play Store
-      window.location.href = PLAY_URL;
-    }
+    // Desactivado para pruebas
+    window.location.href = PLAY_URL;
   }
 
   const ts_click = Date.now();
+
   const payload = {
-    ua_js: navigator.userAgent,
+    // AHORA usa el UA ESTABLE (normalizado)
+    ua_js: getStableUserAgent(),
+
     language: navigator.language,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+
     innerW: window.innerWidth,
     innerH: window.innerHeight,
     screenW: screen.width,
@@ -169,34 +171,34 @@ async function getDeviceFingerprint() {
   };
 
   try {
-    const result = await getDeviceFingerprint();
-    console.log('[Landing] device fingerprint:', result);
-    payload.fp_id = result;
-  } catch(e){}
+    const fp = await getDeviceFingerprint();
+    console.log('[Landing] device fingerprint:', fp);
+    payload.fp_id = fp;
+  } catch (e) { }
 
   try {
-      console.log('[Landing] visitorId:', payload.fp_id);
-      const res = await fetch('/api/click', {
+    console.log('[Landing] visitorId:', payload.fp_id);
+
+    const res = await fetch('/api/click', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({campaign:'android', payload})
     });
 
     if (!res.ok) {
-      console.error('API /click no OK', res.status, res.statusText);
-      redirectToAppOrStore(null); // aún así redirigimos
+      redirectToAppOrStore(null);
       return;
     }
 
     const { token } = await res.json();
     redirectToAppOrStore(token);
-  } catch(e){
+
+  } catch (e) {
     console.error('Error en fetch /api/click:', e);
-    // Si falla la API, igualmente mandamos al Play Store / app
     redirectToAppOrStore(null);
   }
 })();
-</script>
 
+</script>
 </body>
 </html>
