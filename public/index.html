@@ -26,6 +26,7 @@ function getStableUserAgent() {
 
 // ------------------------------------------
 //  UTILIDADES ORIGINALES (hash, storage...)
+//  (pueden quedar aunque no se usen en el FP)
 // ------------------------------------------
 
 function bufferToHex(buffer) {
@@ -64,6 +65,7 @@ function hasSessionStorage() {
 
 // ----------------------------
 //  COMPONENTES DEL FINGERPRINT
+//  (solo parámetros muy estables)
 // ----------------------------
 function getFingerprintComponents() {
   const nav = navigator || {};
@@ -76,31 +78,26 @@ function getFingerprintComponents() {
   } catch (e) { timeZone = ''; }
 
   return {
-    // SOLO la parte estable del UA
+    // SOLO la parte estable del UA (normalizado)
     stableUserAgent: getStableUserAgent(),
 
+    // Plataforma / dispositivo
     platform: nav.platform || '',
-    language: nav.language || '',
-    languages: Array.isArray(nav.languages) ? nav.languages.join(',') : '',
-    maxTouchPoints: nav.maxTouchPoints || 0,
 
-    // Pantalla
+    // Pantalla (dimensiones físicas)
     screenWidth: scr.width || 0,
     screenHeight: scr.height || 0,
-    availWidth: scr.availWidth || 0,
-    availHeight: scr.availHeight || 0,
     colorDepth: scr.colorDepth || 0,
+
+    // Escalado
     pixelRatio: window.devicePixelRatio || 1,
 
     // Zona horaria
     timezoneOffset: new Date().getTimezoneOffset(),
     timeZone,
 
-    // Capacidades
-    cookieEnabled: nav.cookieEnabled ? 1 : 0,
-    doNotTrack: nav.doNotTrack || '',
-    localStorage: hasLocalStorage(),
-    sessionStorage: hasSessionStorage()
+    // Opcional pero bastante estable
+    maxTouchPoints: nav.maxTouchPoints || 0
   };
 }
 
@@ -159,6 +156,7 @@ async function getDeviceFingerprint() {
     // AHORA usa el UA ESTABLE (normalizado)
     ua_js: getStableUserAgent(),
 
+    // Estos datos siguen siendo útiles para analítica, pero NO se usan en el hash
     language: navigator.language,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
 
