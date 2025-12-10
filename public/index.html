@@ -113,6 +113,8 @@ function buildCanonicalString(components) {
 
 async function getDeviceFingerprint() {
   const components = getFingerprintComponents();
+  console.log('[FP Components]', components);
+  console.log('[FP Canonical]', buildCanonicalString(components));  
   const canonical = buildCanonicalString(components);
 
   if (!crypto.subtle) {
