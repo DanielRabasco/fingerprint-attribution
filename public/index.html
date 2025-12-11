@@ -122,19 +122,32 @@ async function getDeviceFingerprint() {
 //  LANZADOR + REDIRECCIÓN
 // ----------------------------
 (async function() {
-  const PLAY_URL = 'https://google.com';
+  const ANDROID_URL = 'https://play.google.com/store/apps/details?id=com.cognifit.app';
+  const IOS_URL = 'https://apps.apple.com/es/app/cognifit-test-y-juegos/id528285610';
+  const WEB_FALLBACK_URL = 'https://www.cognifit.com'; // por si se abre desde escritorio u otros SO
 
   function redirectToAppOrStore(token) {
-    return;
     const ua = navigator.userAgent || '';
     const isAndroid = /Android/i.test(ua);
+    const isIOS = /iPhone|iPad|iPod/i.test(ua);
     const isChrome = /Chrome/i.test(ua);
 
-    const intentUrl =
-      `intent://open?ctx=${encodeURIComponent(token)}#Intent;scheme=myapp;package=com.tuapp;end`;
+    // ANDROID
+    if (isAndroid) {
+      // Si en algún momento tienes deep link (intent://...) con token, lo añades aquí.
+      // De momento, enviamos directamente a la Play Store.
+      window.location.href = ANDROID_URL;
+      return;
+    }
 
-    // Desactivado para pruebas
-    window.location.href = PLAY_URL;
+    // iOS
+    if (isIOS) {
+      window.location.href = IOS_URL;
+      return;
+    }
+
+    // Otros dispositivos (escritorio, etc.)
+    window.location.href = WEB_FALLBACK_URL;
   }
 
   const ts_click = Date.now();
