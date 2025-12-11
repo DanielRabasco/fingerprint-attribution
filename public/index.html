@@ -135,12 +135,13 @@ async function getDeviceFingerprint() {
   }
 
   const ts_click = Date.now();
+  const components = getFingerprintComponents();
 
   const payload = {
     // Estos datos siguen siendo útiles para analítica, pero NO se usan en el hash
     language: navigator.language,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-
+    components: components,
     innerW: window.innerWidth,
     innerH: window.innerHeight,
     screenW: screen.width,

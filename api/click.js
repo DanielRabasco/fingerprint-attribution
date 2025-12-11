@@ -38,6 +38,7 @@ module.exports = async (req, res) => {
     const userAgent = payload?.ua_js || req.headers['user-agent'] || null;
     const language = payload?.language || null;
     const timezone = payload?.timezone || null;
+    const components = payload?.components || null;
 
     let screen = null;
     if (payload) {
@@ -54,6 +55,7 @@ module.exports = async (req, res) => {
       ts = new Date(payload.ts_click).toISOString();
     }
 
+    console.log('[api/click] components:', components);
     console.log('[api/click] fp_id a guardar:', fp_id);
     console.log('[api/click] ts a guardar:', ts);
 
