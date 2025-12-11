@@ -9,21 +9,6 @@
 <body>
 <script>
 
-// -----------------------------
-//  EXTRACCIÓN DEL UA ESTABLE
-// -----------------------------
-function getStableUserAgent() {
-  const ua = navigator.userAgent || "";
-
-  const base = "Mozilla/5.0 (Linux; Android)";
-  const webkit = "AppleWebKit/537.36 (KHTML, like Gecko)";
-  const safari = "Mobile Safari/537.36";
-
-  return `${base} ${webkit} ${safari}`;
-}
-
-
-
 // ------------------------------------------
 //  UTILIDADES ORIGINALES (hash, storage...)
 //  (pueden quedar aunque no se usen en el FP)
@@ -79,7 +64,6 @@ function getFingerprintComponents() {
     pixelRatio: window.devicePixelRatio || 1,
     screenHeight: scr.height || 0,
     screenWidth: scr.width || 0,
-    stableUserAgent: getStableUserAgent(),
     timeZone,
     timezoneOffset: new Date().getTimezoneOffset(),
   };
@@ -153,9 +137,6 @@ async function getDeviceFingerprint() {
   const ts_click = Date.now();
 
   const payload = {
-    // AHORA usa el UA ESTABLE (normalizado)
-    ua_js: getStableUserAgent(),
-
     // Estos datos siguen siendo útiles para analítica, pero NO se usan en el hash
     language: navigator.language,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
