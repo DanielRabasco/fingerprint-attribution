@@ -90,11 +90,17 @@ export default async function handler(req, res) {
     body?.payload?.token ||
     null;
 
+  const components =
+    body.components ||
+    body?.payload?.components ||
+    null;
+
   if (!fpId) {
     console.error('[api/open] missing_fingerprint. Body recibido:', JSON.stringify(body));
     return res.status(400).json({ error: 'missing_fingerprint' });
   }
 
+  console.log('[api/open] components:', components);
   console.log('[api/open] fpId recibido:', fpId, 'ip recibida:', ip);
 
   // 1) Buscar el último click_event con ese fingerprint + IP
