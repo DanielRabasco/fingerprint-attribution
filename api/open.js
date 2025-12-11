@@ -90,9 +90,6 @@ export default async function handler(req, res) {
     body?.payload?.token ||
     null;
 
-  const screen = body?.payload?.screen;
-  console.log('[api/open] BODY recibido:', body);
-
   if (!fpId) {
     console.error('[api/open] missing_fingerprint. Body recibido:', JSON.stringify(body));
     return res.status(400).json({ error: 'missing_fingerprint' });
