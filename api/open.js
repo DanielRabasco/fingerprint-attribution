@@ -6,32 +6,24 @@ const supa = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-const allowedOrigins = [
-  'https://fingerprint-project-theta.vercel.app', // producción
-];
-
 function setupCors(req, res) {
-  const origin = req.headers.origin;
+  const origin = req.headers.origin || '*';
 
-  const isLocalhost =
-    origin &&
-    /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
-
-  const isAllowedExplicitly =
-    origin && allowedOrigins.includes(origin);
-
-  if (origin && (isLocalhost || isAllowedExplicitly)) {
-    // Refleja exactamente el origin permitido
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  }
-
+  // Permitir cualquier origen
+  res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Vary', 'Origin');
+
+  // Métodos permitidos
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
+
+  // Cabeceras permitidas
   res.setHeader(
     'Access-Control-Allow-Headers',
     'Content-Type, X-Requested-With, Accept'
   );
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
+
+  // IMPORTANTE: no usamos credenciales
+  // NO poner Access-Control-Allow-Credentials
 }
 
 export default async function handler(req, res) {
@@ -96,7 +88,10 @@ export default async function handler(req, res) {
     null;
 
   if (!fpId) {
-    console.error('[api/open] missing_fingerprint. Body recibido:', JSON.stringify(body));
+    console.error(
+      '[api/open] missing_fingerprint. Body recibido:',
+      JSON.stringify(body)
+    );
     return res.status(400).json({ error: 'missing_fingerprint' });
   }
 
